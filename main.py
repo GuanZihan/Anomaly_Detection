@@ -24,6 +24,9 @@ def display_image(dataloader):
 
 
 if __name__ == '__main__':
+    """
+    Generating and display anomaly images
+    """
     opt = get_arguments().parse_args()
     train_bad_loader, bad_subset_loader, clean_subset_loader, train_data_bad, perm = get_anomaly_loader(opt)
 

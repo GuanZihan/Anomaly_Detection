@@ -11,7 +11,7 @@ def get_arguments():
     parser.add_argument('--model_name', type=str, default='WRN-16-2', help='name of model')
 
     # training hyper parameters
-    parser.add_argument('--print_freq', type=int, default=200, help='frequency of showing training results on console')
+    parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
     parser.add_argument('--tuning_epochs', type=int, default=20, help='number of tune epochs to run')
     parser.add_argument('--batch_size', type=int, default=64, help='The size of batch')
     parser.add_argument('--lr', type=float, default=0.1, help='initial learning rate')
@@ -32,6 +32,7 @@ def get_arguments():
     # others
     parser.add_argument('--seed', type=int, default=2, help='random seed')
     parser.add_argument('--note', type=str, default='try', help='note for this run')
+    parser.add_argument('--log', type=bool, default=True, help='Save log files or not')
 
     # backdoor attacks
     parser.add_argument('--inject_portion', type=float, default=0.1, help='ratio of backdoor samples')
