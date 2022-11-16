@@ -25,17 +25,35 @@ def compute_loss_value(opt, poisoned_data, model_ascent):
                                      batch_size=1,
                                      shuffle=False,
                                      )
+    labels = []
+    features = None
     for idx, (img, target) in tqdm(enumerate(example_data_loader, start=0)):
+        feat_list = []
+        for i, element in enumerate(target):
+            labels.append(element)
         if opt.cuda:
             img = img.cuda()
             target = target.cuda()
+
+        def hook(module, input, output):
+            feat_list.append(output.clone().detach())
+
         with torch.no_grad():
+            handle=model_ascent.avgpool.register_forward_hook(hook)
             output = model_ascent(img)
             loss = criterion(output, target)
+            feat = torch.flatten(feat_list[0], 1)
+            handle.remove()
+
+        current_features = feat.cpu().numpy()
+        if features is not None:
+            features = np.concatenate((features, current_features))
+        else:
+            features = current_features
         losses_record_original.append(loss.item())
 
     losses_idx = np.argsort(np.array(losses_record_original))
-    return losses_idx
+    return losses_idx, features, labels
 
 
 def isolate_data(poisoned_data, losses_idx, ratio):
@@ -245,19 +263,22 @@ def train(opt):
         losses_bad.append(acc_bad_trainset[2])
 
         # compute the loss value and isolate data at iteration 20
-        # if epoch < 10:
-        #     logger.info('----------- Calculate loss value per example -----------')
-        #     losses_idx = compute_loss_value(opt, train_data_bad, model_ascent)
-        #     logger.info('----------- Collect isolation data -----------')
-        #     IPs = []
-        #     for i in [opt.inject_portion]:
-        #         perm2 = isolate_data(train_data_bad, losses_idx, i)
-        #         intersection = perm1 & perm2
-        #         ip = len(intersection) / len(perm2)
-        #         IPs.append(ip)
-        #         print(
-        #             "[Attack] {} [isolation_ratio] {:.2f} [Isolation Precision] {:.2f}".format(opt.trigger_type, i, ip))
-        #     Ip_dict[epoch] = IPs
+        if epoch < 1:
+            logger.info('----------- Calculate loss value per example -----------')
+            losses_idx, features, labels = compute_loss_value(opt, train_data_bad, model_ascent)
+            logger.info('----------- Collect isolation data -----------')
+            IPs = []
+            save_directory = "./experiments/"
+            np.save(save_directory+"features_{}.npy".format(opt.trigger_type), features)
+            np.save(save_directory+"labels_{}.npy".format(opt.trigger_type), labels)
+            for i in [opt.inject_portion]:
+                perm2 = isolate_data(train_data_bad, losses_idx, i)
+                intersection = perm1 & perm2
+                ip = len(intersection) / len(perm2)
+                IPs.append(ip)
+                print(
+                    "[Attack] {} [isolation_ratio] {:.2f} [Isolation Precision] {:.2f}".format(opt.trigger_type, i, ip))
+            Ip_dict[epoch] = IPs
     np.save("losses_bad.npy", losses_bad)
     np.save("losses_clean.npy", losses_clean)
 
@@ -268,6 +289,8 @@ def main():
     opt = get_arguments().parse_args()
     logger.info('attack: ' + str(opt.trigger_type) + " injection ratio: " + str(opt.inject_portion))
     train(opt)
+
+
 
 
 if __name__ == '__main__':
